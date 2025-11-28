@@ -1,0 +1,1 @@
+uv run main.py C:\Users\Muthulakshmi Jayaram\Documents\mcp-integration-suite\dist\index.js
