@@ -154,10 +154,8 @@ class MCPAsyncTool(BaseTool):
 
         return "\n".join(outputs)
 
-    # 🔥 REQUIRED TO FIX THE ABSTRACT CLASS ERROR
     def _run(self, *args, **kwargs) -> str:
         return asyncio.run(self._arun(*args, **kwargs))
-
 
 
 # =====================================================================
@@ -221,7 +219,7 @@ class MCPClient:
 
 
 # =====================================================================
-# ============ FASTAPI SERVER + ROUTES HERE ===========================
+# ============ FASTAPI SERVER ROUTES =================================
 # =====================================================================
 
 app = FastAPI(title="MCP Integration Suite API")
@@ -243,6 +241,9 @@ class ConnectRequest(PModel):
     server_path: str
 
 
+# ---------------------------------------------------------------------
+# 1️⃣ CONNECT ROUTE  (OK)
+# ---------------------------------------------------------------------
 @app.post("/connect")
 async def connect_api(req: ConnectRequest):
     global is_connected
@@ -258,32 +259,53 @@ async def connect_api(req: ConnectRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ---------------------------------------------------------------------
+# 2️⃣ CHAT ROUTE — ⭐⭐⭐ UPDATED ⭐⭐⭐
+# ---------------------------------------------------------------------
 @app.post("/chat")
 async def chat_api(req: ChatRequest):
     if not is_connected:
         raise HTTPException(400, "Not connected")
 
     try:
-        return {"response": await mcp_client_api.process_query(req.message)}
+        response = await mcp_client_api.process_query(req.message)
+
+        # ⭐⭐⭐ PRINT RESPONSE TO TERMINAL ⭐⭐⭐
+        print("\n================ CHAT RESPONSE ================")
+        print(response)
+        print("===============================================\n")
+
+        return {"response": response}
+
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
-def shutdown_server():
-    time.sleep(0.3)
-    os.kill(os.getpid(), signal.SIGINT)
+# ---------------------------------------------------------------------
+# 3️⃣ DISCONNECT ROUTE — ⭐⭐⭐ UPDATED ⭐⭐⭐
+# ---------------------------------------------------------------------
+
+def kill_server():
+    """Fully stop the FastAPI server process."""
+    time.sleep(0.5)
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 @app.post("/disconnect")
 async def disconnect_api():
     global is_connected
+
     try:
         await mcp_client_api.cleanup()
         is_connected = False
 
-        threading.Thread(target=shutdown_server, daemon=True).start()
+        print("\n🔥 Server disconnecting & shutting down…\n")
 
-        return {"status": "disconnected"}
+        # ⭐⭐⭐ EXIT SERVER COMPLETELY ⭐⭐⭐
+        threading.Thread(target=kill_server, daemon=True).start()
+
+        return {"status": "disconnected_and_exited"}
+
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -294,6 +316,6 @@ async def disconnect_api():
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "api":
         import uvicorn
-        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False)
     else:
         print("Run with: python main.py api")
