@@ -698,48 +698,137 @@ import time
 import os
 from fastapi import HTTPException
 
-SERVER_PATH = r"C:\Users\Muthulakshmi Jayaram\Documents\mcp-integration-suite\dist\index.js"
+# SERVER_PATH = r"C:\Users\Muthulakshmi Jayaram\Documents\mcp-integration-suite\dist\index.js"
 
 
+from fastapi.responses import StreamingResponse
+
+import json
+
+import asyncio
+from fastapi.responses import StreamingResponse
+
+from fastapi import HTTPException
+
+import json
+
+import asyncio
+ 
+from fastapi.responses import StreamingResponse
+
+import json
+
+import asyncio
+#with streaming
 @app.post("/query")
+
 async def query_api(req: QueryRequest):
+
     global is_connected
+ 
+    PATH = r"C:\\Users\\Muthulakshmi Jayaram\\Documents\\mcp-integration-suite\\dist\\index.js"
+ 
+    # Auto-connect
 
-    # Auto-connect only once
     if not is_connected:
+
         try:
-            await mcp_client.connect_to_server(SERVER_PATH)
+
+            await mcp_client.connect_to_server(PATH)
+
             is_connected = True
-            print(f"✅ Auto-connected to MCP server: {SERVER_PATH}")
+
+            print(f"✅ MCP server auto-connected to: {PATH}")
+
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to connect to MCP server: {str(e)}"
-            )
 
-    # Process Query
-    try:
-        result = await mcp_client.process_query(req.query)
+            raise HTTPException(status_code=500, detail=f"Failed to connect: {str(e)}")
+ 
+    async def streamer():
 
-        # Debug logs
-        print(
-            f"""
-================== MCP QUERY ==================
-Server Path : {SERVER_PATH}
-Query       : {req.query}
------------------- RESULT ----------------------
-{result}
-================================================
-"""
-        )
+        """Yield chunks while MCP is processing query"""
+ 
+        yield "⏳ Processing started...\n\n"
+ 
+        try:
 
-        return {"response": result}
+            # CALL THE MCP QUERY PROCESSOR
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Query processing failed: {str(e)}"
-        )
+            result = await mcp_client.process_query(req.query)
+ 
+            # Print to terminal too
+
+            print("\n=========== QUERY ===========")
+
+            print("Server Path :", PATH)
+
+            print("Query       :", req.query)
+
+            print("=========== RESULT ==========")
+
+            print(result)
+
+            print("=============================\n")
+ 
+            # Stream the final result in chunks
+
+            for line in result.split("\n"):
+
+                yield line + "\n"
+
+                await asyncio.sleep(0)   # allow async flush
+ 
+        except Exception as e:
+
+            yield f"❌ ERROR: {str(e)}\n"
+ 
+        yield "\n✔️ Completed.\n"
+ 
+    return StreamingResponse(streamer(), media_type="text/plain")
+
+ 
+#without streaming
+# @app.post("/query")
+# async def query_api(req: QueryRequest):
+#     global is_connected
+
+#     # Auto-connect only once
+#     if not is_connected:
+#         try:
+#             await mcp_client.connect_to_server(SERVER_PATH)
+#             is_connected = True
+#             print(f"✅ Auto-connected to MCP server: {SERVER_PATH}")
+#         except Exception as e:
+#             raise HTTPException(
+#                 status_code=500,
+#                 detail=f"Failed to connect to MCP server: {str(e)}"
+#             )
+
+#     # Process Query
+#     try:
+#         result = await mcp_client.process_query(req.query)
+
+#         # Debug logs
+#         print(
+#             f"""
+# ================== MCP QUERY ==================
+# Server Path : {SERVER_PATH}
+# Query       : {req.query}
+# ------------------ RESULT ----------------------
+# {result}
+# ================================================
+# """
+#         )
+
+#         return {"response": result}
+
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Query processing failed: {str(e)}"
+#         )
+
+
 
 def kill_server():
     time.sleep(0.2)   # allow Postman to receive the response
@@ -794,8 +883,4 @@ async def disconnect_api(req: dict):
 #            MAIN ENTRY
 # ====================================
 if __name__ == "__main__":
-    if "api" in sys.argv:
-        uvicorn.run("main:app", host="0.0.0.0", port=8000)
-    else:
-        print("Run with: python main.py api")
-    
+    uvicorn.run("main:app", host="0.0.0.0", port=8000,reload=True)

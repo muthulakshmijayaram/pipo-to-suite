@@ -3,4 +3,3 @@ python-dotenv
 mcp
 fastmcp
 fastapi
-signal
